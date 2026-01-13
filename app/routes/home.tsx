@@ -1,6 +1,7 @@
 import Navbar from '../components/Navbar'; // Don't forget this import!
 import type { Route } from "./+types/home";
 import ResumeCard from "~/components/ResumeCard";
+import ResumeCarousel from "~/components/ResumeCarousel";
 import {usePuterStore} from "~/lib/puter";
 import {useNavigate, Link} from "react-router";
 import {useEffect, useState} from "react";
@@ -36,6 +37,7 @@ export default function Home() {
                 setLoadingResumes(false);
             }
 
+            loadResumes();
         }, []);
 
 
@@ -45,7 +47,7 @@ export default function Home() {
 
 
         <section className="main-section">
-            <div className="page-heading py-16">
+            <div className="page-heading py-4">
                 <h1>Track Your Applications and Resume</h1>
                 {!loadingResumes && resumes?.length == 0 ? (
                     <h2>No resumes found, please upload your first resume to analyze ! </h2>
@@ -64,12 +66,7 @@ export default function Home() {
                 </div>
             )}
             {!loadingResumes && resumes.length > 0 && (
-                <div className="resumes-section">
-                    {resumes.map((resume) => (
-                        <ResumeCard key={resume.id} resume={resume} />
-                        ))}
-
-                </div>
+                <ResumeCarousel resumes={resumes} />
                 )}
             {!loadingResumes && resumes.length == 0 && (
                 <div className='flex flex-col items-center justify-center mt-10 gap-4'>

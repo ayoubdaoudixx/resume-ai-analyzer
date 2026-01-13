@@ -56,6 +56,10 @@ form {
     .gradient-border {
         @apply bg-gradient-to-b from-light-blue-100 to-light-blue-200 p-4 rounded-2xl;
     }
+    
+    .gradient-border.p-2 {
+        @apply p-2;
+    }
     .primary-button {
         @apply primary-gradient text-white rounded-full px-4 py-2 cursor-pointer w-full;
     }
@@ -75,7 +79,7 @@ form {
         @apply primary-gradient rounded-full py-4 px-8 cursor-pointer w-[600px] max-md:w-full text-3xl font-semibold text-white;
     }
     .main-section {
-        @apply flex flex-col items-center gap-8 pt-12 max-sm:mx-2 mx-15 pb-5;
+        @apply flex flex-col items-center gap-8 pt-4 max-sm:mx-2 mx-15 pb-5;
     }
     .page-heading {
         @apply flex flex-col items-center gap-8 max-w-4xl text-center max-sm:gap-4;
@@ -85,7 +89,11 @@ form {
     }
 
     .resume-card {
-        @apply flex flex-col gap-8 h-[560px] w-[350px] lg:w-[430px] xl:w-[490px] bg-white rounded-2xl p-4;
+        @apply flex flex-col gap-8 h-[560px] w-[300px] lg:w-[340px] xl:w-[380px] bg-white rounded-2xl p-4;
+    }
+    
+    .resume-card.p-2 {
+        @apply p-2;
     }
 
     .resume-card-header {

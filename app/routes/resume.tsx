@@ -51,17 +51,15 @@ const Resume = () => {
     }, [id])
 
     return (
-        <main className="!pt-0">
-            <nav className="resiume-nav">
-                <Link to="/" className="back-button">
-                    <img src="/icons/back.svg" alt="logo" className="w-2.5 h-2.5"/>
-                    <span className="text-gray-800 text-sm font-semibold"> Back To Home Page</span> 
-
+        <main className="!pt-0 bg-[url('/images/bg-main.svg')] bg-cover min-h-screen">
+            <nav className="resume-nav">
+                <Link to="/" className="primary-button w-fit text-xl font-semibold">
+                    Back To Home Page
                 </Link>
             </nav>
 
             <div className="flex flex-row w-full max-lg:flex-col-reverse">
-                <section className="feedback-section bg-[url('/images/bg-small-svg') bg-cover h-[100vh] sticky top-0 items-center justify-center">
+                <section className="feedback-section h-[100vh] sticky top-0 items-center justify-center">
                     {imageUrl && resumeUrl && (
                         <div className="animate-in fade-in duration-1000 gradient-border max-sm:m-0 h-[90%] max-wxl:h-fit w-fit">
                             <a href={resumeUrl} target="_blank" rel="noopener noreferrer">
