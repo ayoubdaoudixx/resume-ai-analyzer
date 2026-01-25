@@ -5,3 +5,9 @@
 # React Router
 /.react-router/
 /build/
+venv/
+.env.local
+.python-version
+__pycache__/
+*.py[cod]
+*$py.class
