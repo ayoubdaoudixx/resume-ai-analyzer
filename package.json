@@ -5,7 +5,7 @@
   "scripts": {
     "build": "react-router build",
     "dev:frontend": "react-router dev",
-    "dev:backend": "cd backend && source venv/bin/activate && python job_service.py",
+    "dev:backend": "source venv/bin/activate && python app/services/job_service.py",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc"
