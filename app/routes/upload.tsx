@@ -15,10 +15,6 @@ const Upload = () => {
     const [statusText, setStatusText] = useState('');
     const [file, setFile] = useState<File | null>(null);
 
-    const JOB_SERVICE = (import.meta as any).env?.VITE_JOB_SERVICE_URL || "http://localhost:8000";
-    const JOB_FETCH_TIMEOUT = 60000; // 60s (Apify runs take ~30-40s)
-    const JOBS_LIMIT = 30; // Show up to 30 best-fitting offers
-
     const handleFileSelect = (file: File | null) => {
         setFile(file);
     }
@@ -26,35 +22,17 @@ const Upload = () => {
     const handleAnalyze = async ({ companyName, jobTitle, jobDescription, file }: { companyName: string, jobTitle: string, jobDescription: string, file: File }) => {
         setIsProcessing(true);
         setStatusText('Your resume is being uploaded ...');
+        const uploadFile = await fs.upload([file]);
 
-        // Sanitize filename to avoid path issues with AI delegates (remove spaces and special chars)
-        const safeUuid = generateUUID().split('-')[0];
-        const safeResumeFile = new File([file], `resume-${safeUuid}.pdf`, { type: file.type });
-
-        const uploadResult = await fs.upload([safeResumeFile]);
-        const uploadFile = Array.isArray(uploadResult) ? uploadResult[0] : uploadResult;
-
-        if (!uploadFile) {
-            setIsProcessing(false);
-            return setStatusText('ERROR: Failed to upload file!!');
-        }
+        if (!uploadFile) return setStatusText('ERROR: Failed to upload file!!');
 
         setStatusText('Converting to image ...');
         const imageFile = await convertPdfToImage(file);
-        if (!imageFile.file) {
-            setIsProcessing(false);
-            return setStatusText('ERROR: Failed to convert pdf to image !!');
-        }
+        if (!imageFile.file) return setStatusText('ERROR: Failed to convert pdf to image !!');
 
         setStatusText('Uploading the Image ...');
-        const safeImageFile = new File([imageFile.file], `resume-${safeUuid}.png`, { type: 'image/png' });
-        const uploadImageResult = await fs.upload([safeImageFile]);
-        const uploadedImage = Array.isArray(uploadImageResult) ? uploadImageResult[0] : uploadImageResult;
-
-        if (!uploadedImage) {
-            setIsProcessing(false);
-            return setStatusText('ERROR: Failed to upload Image !!');
-        }
+        const uploadedImage = await fs.upload([imageFile.file]);
+        if (!uploadedImage) return setStatusText('ERROR: Failed to upload Image !!');
 
 
         setStatusText('Preparing Data ...');
@@ -66,143 +44,84 @@ const Upload = () => {
             imagePath: uploadedImage.path,
             companyName, jobTitle, jobDescription,
             feedback: '',
-            recommendedJobs: [],
-            jobFetchStatus: null
+            recommendedJobs: []
         }
 
         setStatusText('Analyzing Resume Content...');
 
-        try {
-            console.log("Analyzing with Image Path:", uploadedImage.path);
-            const feedback = await ai.feedback(
-                uploadedImage.path,
-                prepareInstructions({ jobTitle, jobDescription })
-            )
+        const feedback = await ai.feedback(
+            uploadFile.path,
+            prepareInstructions({ jobTitle, jobDescription })
+        )
+        
+        if (!feedback) return setStatusText('ERROR: Failed to analyze resume !!');
 
-            if (!feedback) {
-                setIsProcessing(false);
-                return setStatusText('ERROR: Failed to analyze resume (No response) !!');
-            }
+        const feedbackText = typeof feedback.message.content == 'string'
+            ? feedback.message.content
+            : feedback.message.content[0].text;
 
-            const feedbackText = typeof feedback.message.content == 'string'
-                ? feedback.message.content
-                : feedback.message.content[0].text;
+        data.feedback = JSON.parse(feedbackText);
 
-            // Clean JSON response (remove markdown backticks if present)
-            const cleanFeedback = feedbackText.replace(/```json|```/g, "").trim();
-
-            try {
-                data.feedback = JSON.parse(cleanFeedback);
-            } catch (pErr) {
-                console.error("JSON Parse Error:", pErr, "Raw Content:", feedbackText);
-                setIsProcessing(false);
-                return setStatusText('ERROR: AI returned invalid JSON. Please try again.');
-            }
-
-            // --- STEP 1: SAVE INITIAL DATA AND REDIRECT ---
-            // Save the main feedback and send the user to the results page immediately.
-            await kv.set(`resume:${uuid}`, JSON.stringify(data));
-            setStatusText('Analysis Complete! Redirecting...');
-            navigate(`/resume/${uuid}`);
-        } catch (err) {
-            console.error("Analysis failed:", err);
-            setIsProcessing(false);
-            setStatusText(`ERROR: Analysis failed: ${err instanceof Error ? err.message : String(err)}`);
-            return;
-        }
+        // --- STEP 1: SAVE INITIAL DATA AND REDIRECT ---
+        // We save the main feedback and send the user to the results page immediately.
+        await kv.set(`resume:${uuid}`, JSON.stringify(data));
+        setStatusText('Analysis Complete! Redirecting...');
+        navigate(`/resume/${uuid}`);
 
         // --- STEP 2: BACKGROUND PROCESSING FOR JOBS ---
-        // Run job search in background without blocking the redirect.
+        // This is an IIFE (Immediately Invoked Function Expression) that runs without 'awaiting'
+        // so the 'navigate' above isn't delayed by the job search.
         (async () => {
             try {
-                // Mark the resume as processing for jobs so the resume page shows spinner
-                data.jobFetchStatus = 'processing';
-                await kv.set(`resume:${uuid}`, JSON.stringify(data));
+                const extractionPrompt = `Extract the candidate's professional title and a list of skills from this resume. 
+                Return ONLY a valid JSON object with this structure: {"title": "string", "skills": [{"items": ["skill1", "skill2"]}]}`;
 
-                const extractionPrompt = `Please look at this resume and extract:
-                1. The candidate's most relevant professional job title.
-                2. A list of 5-10 key technical skills.
-                
-                Return ONLY a valid JSON object where the title is the job title and the skills are the list of skills.`;
-
-                console.log("Extracting skills using image path:", uploadedImage.path);
-                const extractionResponse = await ai.chat(extractionPrompt, uploadedImage.path);
+                const extractionResponse = await ai.chat(extractionPrompt, uploadFile.path);
 
                 if (extractionResponse && extractionResponse.message) {
                     const extractionText = typeof extractionResponse.message.content === 'string'
                         ? extractionResponse.message.content
                         : extractionResponse.message.content[0].text;
 
-                    console.log("Extracted raw text from AI:", extractionText);
-
                     const cleanJson = extractionText.replace(/```json|```/g, "").trim();
-                    let parsedExtractedData;
-                    try {
-                        parsedExtractedData = JSON.parse(cleanJson);
-                        console.log("Parsed extraction data:", parsedExtractedData);
-                    } catch (err) {
-                        console.error("Failed to parse extraction JSON:", err);
-                        parsedExtractedData = { title: jobTitle, skills: [] };
-                    }
+                    const parsedExtractedData = JSON.parse(cleanJson);
+                    const role = parsedExtractedData.title || jobTitle;
+                    const skills = parsedExtractedData.skills?.flatMap((s: any) => s.items) || [];
+                    const searchQuery = [role, ...skills].filter(Boolean).join(" ").trim();
 
-                    // Store extracted info in the data object for record keeping
-                    data.extractedInfo = parsedExtractedData;
-                    await kv.set(`resume:${uuid}`, JSON.stringify(data));
-
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), JOB_FETCH_TIMEOUT);
-
-                    const payload = {
-                        role: parsedExtractedData.title || jobTitle,
-                        skills: parsedExtractedData.skills?.flatMap((s: any) => s.items) || [],
-                        seniority: "Mid-level",
-                        limit: JOBS_LIMIT
-                    };
-
-                    console.log("Sending job fetch request with payload:", payload);
-
-                    try {
-                        const jobResponse = await fetch(`${JOB_SERVICE}/get-jobs`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload),
-                            signal: controller.signal
-                        });
-
-                        clearTimeout(timeoutId);
-
-                        if (jobResponse.ok) {
-                            const recommendedJobs = await jobResponse.json();
-                            console.log(`Job service returned ${recommendedJobs.length} jobs`);
-                            // Ensure we only store up to JOBS_LIMIT results
-                            data.recommendedJobs = Array.isArray(recommendedJobs) ? recommendedJobs.slice(0, JOBS_LIMIT) : [];
-                            data.jobFetchStatus = 'done';
-                            await kv.set(`resume:${uuid}`, JSON.stringify(data));
-                            console.log("Background jobs updated successfully");
-                        } else {
-                            console.error("Job service returned non-ok:", jobResponse.status);
-                            data.recommendedJobs = [];
-                            data.jobFetchStatus = 'failed';
-                            await kv.set(`resume:${uuid}`, JSON.stringify(data));
+                    let resumeText = "";
+                    const resumeImageUrl = imageFile.imageUrl;
+                    if (resumeImageUrl) {
+                        try {
+                            resumeText = (await ai.img2txt(resumeImageUrl)) || "";
+                        } catch (err) {
+                            console.error("Resume text extraction failed", err);
                         }
-                    } catch (err) {
-                        clearTimeout(timeoutId);
-                        console.error("Background job fetching failed (network/timeout)", err);
-                        data.recommendedJobs = [];
-                        data.jobFetchStatus = 'failed';
-                        await kv.set(`resume:${uuid}`, JSON.stringify(data));
                     }
-                } else {
-                    console.error("No extraction response from AI");
-                    data.recommendedJobs = [];
-                    data.jobFetchStatus = 'failed';
-                    await kv.set(`resume:${uuid}`, JSON.stringify(data));
+
+                    if (!resumeText) {
+                        resumeText = `${role} ${skills.join(" ")} ${jobDescription || ""}`.trim();
+                    }
+
+                    const jobResponse = await fetch("/api/jobs", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            searchQuery,
+                            resumeText,
+                        }),
+                    });
+
+                    if (jobResponse.ok) {
+                        const recommendedJobs = await jobResponse.json();
+                        // Update the KV with the newly found jobs
+                        data.recommendedJobs = recommendedJobs;
+                        await kv.set(`resume:${uuid}`, JSON.stringify(data));
+                        console.log("Background jobs updated successfully");
+                    }
                 }
             } catch (error) {
                 console.error("Background job fetching failed", error);
-                data.recommendedJobs = [];
-                data.jobFetchStatus = 'failed';
-                await kv.set(`resume:${uuid}`, JSON.stringify(data));
             }
         })();
     }
