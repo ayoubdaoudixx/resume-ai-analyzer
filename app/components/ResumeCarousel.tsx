@@ -48,9 +48,11 @@ const ResumeCarousel = ({ resumes }: ResumeCarouselProps) => {
         }
     };
 
+    const GAP_PX = 24;
+
     if (showAll) {
         return (
-            <div className="w-full">
+            <div className="w-full px-6 lg:px-10">
                 <div className="flex justify-between items-center mb-8">
                     <h3 className="text-2xl font-semibold text-gradient">All Resumes</h3>
                     <button
@@ -61,11 +63,11 @@ const ResumeCarousel = ({ resumes }: ResumeCarouselProps) => {
                         Show Less
                     </button>
                 </div>
-                <div className="flex flex-wrap gap-4 justify-start w-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 justify-items-center">
                     {resumes.map((resume, index) => (
                         <div
                             key={resume.id}
-                            className="animate-in fade-in duration-500"
+                            className="animate-in fade-in duration-500 w-full flex justify-center"
                             style={{ animationDelay: `${index * 50}ms` }}
                         >
                             <ResumeCard resume={resume} compact={true} />
@@ -77,7 +79,7 @@ const ResumeCarousel = ({ resumes }: ResumeCarouselProps) => {
     }
 
     return (
-        <div className="w-full">
+        <div className="w-full px-6 lg:px-10">
             <div className="flex justify-between items-center mb-8">
                 <h3 className="text-2xl font-semibold text-gradient">Your Resumes</h3>
                 <div className="flex items-center gap-4">
@@ -94,17 +96,18 @@ const ResumeCarousel = ({ resumes }: ResumeCarouselProps) => {
             <div className="relative">
                 <div className="overflow-hidden rounded-2xl">
                     <div
-                        className="flex transition-transform duration-500 ease-in-out gap-6"
+                        className="flex transition-transform duration-500 ease-in-out"
                         style={{
-                            transform: `translateX(-${currentIndex * (100 / itemsPerView)}%)`,
+                            gap: `${GAP_PX}px`,
+                            transform: `translateX(calc(-${currentIndex} * ((100% - ${(itemsPerView - 1) * GAP_PX}px) / ${itemsPerView} + ${GAP_PX}px)))`,
                         }}
                     >
-                        {resumes.map((resume, index) => (
+                        {resumes.map((resume) => (
                             <div
                                 key={resume.id}
-                                className="flex-shrink-0"
+                                className="flex-shrink-0 flex justify-center"
                                 style={{
-                                    width: `${(100 / itemsPerView) * 1.05}%`,
+                                    width: `calc((100% - ${(itemsPerView - 1) * GAP_PX}px) / ${itemsPerView})`,
                                 }}
                             >
                                 <ResumeCard resume={resume} />

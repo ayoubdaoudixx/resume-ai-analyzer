@@ -5,6 +5,7 @@ import { usePuterStore } from "~/lib/puter";
 import { useNavigate } from "react-router";
 import { convertPdfToImage } from "~/lib/pdf2img";
 import { generateUUID } from "~/lib/utils";
+import { recommendJobs } from "~/lib/jobMatcher";
 import { prepareInstructions } from "../../constants";
 
 const Upload = () => {
@@ -69,59 +70,72 @@ const Upload = () => {
         navigate(`/resume/${uuid}`);
 
         // --- STEP 2: BACKGROUND PROCESSING FOR JOBS ---
-        // This is an IIFE (Immediately Invoked Function Expression) that runs without 'awaiting'
-        // so the 'navigate' above isn't delayed by the job search.
+        // Runs without 'await' so the navigate() above isn't delayed.
         (async () => {
+            // Guaranteed baseline from user-provided form fields.
+            let role = jobTitle?.trim() || "";
+            let skills: string[] = [];
+            let resumeText = `${role} ${jobDescription || ""}`.trim();
+
+            // Try to enrich with AI-extracted title/skills. Any failure here is non-fatal —
+            // the baseline above is enough to call JSearch.
             try {
-                const extractionPrompt = `Extract the candidate's professional title and a list of skills from this resume. 
-                Return ONLY a valid JSON object with this structure: {"title": "string", "skills": [{"items": ["skill1", "skill2"]}]}`;
-
+                const extractionPrompt =
+                    `Extract the candidate's professional title and skills from this resume. ` +
+                    `Return ONLY valid JSON: {"title": "string", "skills": ["skill1", "skill2"]}`;
                 const extractionResponse = await ai.chat(extractionPrompt, uploadFile.path);
-
-                if (extractionResponse && extractionResponse.message) {
-                    const extractionText = typeof extractionResponse.message.content === 'string'
-                        ? extractionResponse.message.content
-                        : extractionResponse.message.content[0].text;
-
-                    const cleanJson = extractionText.replace(/```json|```/g, "").trim();
-                    const parsedExtractedData = JSON.parse(cleanJson);
-                    const role = parsedExtractedData.title || jobTitle;
-                    const skills = parsedExtractedData.skills?.flatMap((s: any) => s.items) || [];
-                    const searchQuery = [role, ...skills].filter(Boolean).join(" ").trim();
-
-                    let resumeText = "";
-                    const resumeImageUrl = imageFile.imageUrl;
-                    if (resumeImageUrl) {
-                        try {
-                            resumeText = (await ai.img2txt(resumeImageUrl)) || "";
-                        } catch (err) {
-                            console.error("Resume text extraction failed", err);
+                const content = extractionResponse?.message?.content;
+                const extractionText =
+                    typeof content === "string"
+                        ? content
+                        : Array.isArray(content) && content[0]?.text
+                            ? content[0].text
+                            : "";
+                if (extractionText) {
+                    const match = extractionText.match(/\{[\s\S]*\}/);
+                    if (match) {
+                        const parsed = JSON.parse(match[0]);
+                        if (parsed.title) role = parsed.title;
+                        if (Array.isArray(parsed.skills)) {
+                            skills = parsed.skills
+                                .flatMap((s: any) =>
+                                    typeof s === "string" ? [s] : Array.isArray(s?.items) ? s.items : []
+                                )
+                                .filter(Boolean);
                         }
                     }
-
-                    if (!resumeText) {
-                        resumeText = `${role} ${skills.join(" ")} ${jobDescription || ""}`.trim();
-                    }
-
-                    const jobResponse = await fetch("/api/jobs", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            searchQuery,
-                            resumeText,
-                        }),
-                    });
-
-                    if (jobResponse.ok) {
-                        const recommendedJobs = await jobResponse.json();
-                        // Update the KV with the newly found jobs
-                        data.recommendedJobs = recommendedJobs;
-                        await kv.set(`resume:${uuid}`, JSON.stringify(data));
-                        console.log("Background jobs updated successfully");
-                    }
                 }
-            } catch (error) {
-                console.error("Background job fetching failed", error);
+            } catch (err) {
+                console.warn("AI extraction failed, falling back to form fields:", err);
+            }
+
+            // Try to OCR the resume image for richer matching text. Non-fatal on failure.
+            try {
+                if (imageFile.file) {
+                    const ocrText = (await ai.img2txt(imageFile.file)) || "";
+                    if (ocrText) resumeText = ocrText;
+                }
+            } catch (err) {
+                console.warn("Resume OCR failed, falling back to form fields:", err);
+            }
+
+            const searchQuery = [role, ...skills].filter(Boolean).join(" ").trim() || role;
+            if (!searchQuery) {
+                console.error("No searchable info — please fill the Job Title field on upload");
+                return;
+            }
+            if (!resumeText) {
+                resumeText = searchQuery;
+            }
+
+            console.log("Fetching jobs for:", searchQuery);
+            try {
+                const recommendedJobs = await recommendJobs(searchQuery, resumeText);
+                data.recommendedJobs = recommendedJobs;
+                await kv.set(`resume:${uuid}`, JSON.stringify(data));
+                console.log(`Background jobs updated: ${recommendedJobs.length} matches`);
+            } catch (err) {
+                console.error("recommendJobs threw:", err);
             }
         })();
     }

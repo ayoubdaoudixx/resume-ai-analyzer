@@ -27,6 +27,7 @@ const Resume = () => {
     const [imageUrl, setImageUrl] = useState('');
     const [feedback, setFeedback] = useState<any | null>(null);
     const [jobs, setJobs] = useState<Job[]>([]);
+    const [jobsLoading, setJobsLoading] = useState(true);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -35,22 +36,25 @@ const Resume = () => {
 
     useEffect(() => {
         let timeoutId: any;
+        let attempts = 0;
+        const MAX_ATTEMPTS = 20;
 
         const loadresume = async () => {
             const resume = await kv.get(`resume:${id}`);
             if(!resume) return;
             const data = JSON.parse(resume);
 
-            // Update feedback and jobs
             setFeedback(data.feedback);
-            setJobs(data.recommendedJobs || []);
+            const recommended = data.recommendedJobs || [];
+            setJobs(recommended);
 
-            // Live update: Poll every 3 seconds if jobs aren't loaded yet
-            if (!data.recommendedJobs || data.recommendedJobs.length === 0) {
+            if (recommended.length === 0 && attempts < MAX_ATTEMPTS) {
+                attempts += 1;
                 timeoutId = setTimeout(loadresume, 3000);
+            } else {
+                setJobsLoading(false);
             }
 
-            // Load resume blob
             if (!resumeUrl) {
                 const resumeBlob = await fs.read(data.resumePath);
                 if(resumeBlob) {
@@ -60,7 +64,6 @@ const Resume = () => {
                 }
             }
 
-            // Load image blob
             if (!imageUrl) {
                 const imageBlob = await fs.read(data.imagePath);
                 if(imageBlob) {
@@ -68,15 +71,12 @@ const Resume = () => {
                     setImageUrl(url);
                 }
             }
-
-            console.log({resumeUrl, imageUrl, feedback: data.feedback, jobs: data.recommendedJobs});
         }
 
         if (!isLoading && auth.isAuthenticated) {
             loadresume();
         }
 
-        // Cleanup timeout on unmount
         return () => {
             if (timeoutId) clearTimeout(timeoutId);
         };
@@ -89,6 +89,7 @@ const Resume = () => {
                     Back To Home Page
                 </Link>
             </nav>
+
             <div className="flex flex-row w-full max-lg:flex-col-reverse">
                 <section className="feedback-section h-[100vh] sticky top-0 items-center justify-center">
                     {imageUrl && resumeUrl && (
@@ -106,25 +107,35 @@ const Resume = () => {
                             <Summary feedback={feedback}/>
                             <ATS score={feedback.ATS?.score || 0} suggestions={feedback.ATS?.tips || []}/>
                             <Details feedback={feedback}/>
-
-                            {/* Recommended Jobs Section */}
-                            <div className="mt-12 border-t pt-8">
-                                {jobs.length > 0 ? (
-                                    <JobCards jobs={jobs} />
-                                ) : (
-                                    <div className="flex flex-col items-center p-8 bg-blue-50 rounded-2xl border border-dashed border-blue-200">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                                        <p className="text-blue-600 font-medium">Searching for best-fitting roles based on your skills...</p>
-                                        <p className="text-blue-400 text-xs mt-1">This takes about 20-30 seconds</p>
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     ) : (
                         <img src="/images/resume-scan-2.gif" className="w-full"/>
                     )}
                 </section>
             </div>
+
+            <section className="w-full px-6 lg:px-16 py-16 bg-white/40 backdrop-blur-sm border-t border-gray-200">
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">
+                    Recommended Jobs Based on Your Profile
+                </h1>
+                <p className="text-gray-600 mb-10 text-lg">
+                    Hand-picked roles ranked by how closely they match your resume.
+                </p>
+
+                {jobs.length > 0 ? (
+                    <JobCards jobs={jobs} />
+                ) : jobsLoading ? (
+                    <div className="flex flex-col items-center justify-center p-16 bg-blue-50 rounded-2xl border border-dashed border-blue-200">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
+                        <p className="text-blue-700 font-semibold text-lg">Searching for best-fitting roles based on your skills...</p>
+                        <p className="text-blue-500 text-sm mt-1">This usually takes 20-30 seconds</p>
+                    </div>
+                ) : (
+                    <div className="p-10 bg-gray-50 rounded-2xl border border-gray-200 text-center">
+                        <p className="text-gray-600 text-lg">No matching jobs were found right now. Try uploading another resume or check back shortly.</p>
+                    </div>
+                )}
+            </section>
         </main>
     )
 }
