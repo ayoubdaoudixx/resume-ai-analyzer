@@ -48,7 +48,7 @@ const ResumeCarousel = ({ resumes }: ResumeCarouselProps) => {
         }
     };
 
-    const GAP_PX = 24;
+    const GAP_PX = 32;
 
     if (showAll) {
         return (
