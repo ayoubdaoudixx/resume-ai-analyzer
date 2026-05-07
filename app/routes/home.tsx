@@ -1,339 +1,452 @@
-import Navbar from '../components/Navbar';
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+
 import type { Route } from "./+types/home";
-import ResumeCarousel from "~/components/ResumeCarousel";
+import { Shell } from "~/components/resumer/Shell";
+import { SectionHead } from "~/components/resumer/SectionHead";
 import { usePuterStore } from "~/lib/puter";
-import { useNavigate, Link } from "react-router";
-import { useEffect, useState } from "react";
 
 export function meta({}: Route.MetaArgs) {
-    return [
-        { title: "Resumer" },
-        { name: "description", content: "Your AI-powered resume coach" },
-    ];
+  return [
+    { title: "Resumer — read closely" },
+    {
+      name: "description",
+      content:
+        "Resume intelligence — score against the ATS, get plain-English fixes, and find roles that match.",
+    },
+  ];
 }
 
-const steps = [
-    {
-        number: "01",
-        icon: (
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-10 h-10">
-                <rect x="8" y="4" width="28" height="36" rx="3" fill="url(#pdf-grad)" />
-                <path d="M28 4v10h8" stroke="white" strokeWidth="1.5" strokeLinejoin="round" fill="none" opacity="0.6"/>
-                <rect x="14" y="20" width="16" height="2" rx="1" fill="white" opacity="0.8"/>
-                <rect x="14" y="25" width="12" height="2" rx="1" fill="white" opacity="0.6"/>
-                <rect x="14" y="30" width="14" height="2" rx="1" fill="white" opacity="0.6"/>
-                <circle cx="36" cy="36" r="9" fill="url(#upload-grad)" />
-                <path d="M36 33v6M33 35l3-3 3 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                <defs>
-                    <linearGradient id="pdf-grad" x1="8" y1="4" x2="36" y2="40" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#818cf8"/>
-                        <stop offset="1" stopColor="#606beb"/>
-                    </linearGradient>
-                    <linearGradient id="upload-grad" x1="27" y1="27" x2="45" y2="45" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#34d399"/>
-                        <stop offset="1" stopColor="#059669"/>
-                    </linearGradient>
-                </defs>
-            </svg>
-        ),
-        title: "Upload Your Resume",
-        description: "Drop your PDF resume into Resumer. We accept any standard resume format up to 20MB — no reformatting needed.",
-    },
-    {
-        number: "02",
-        icon: (
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-10 h-10">
-                <circle cx="24" cy="24" r="18" fill="url(#scan-bg)" opacity="0.15"/>
-                <circle cx="24" cy="24" r="13" stroke="url(#scan-stroke)" strokeWidth="2" fill="none"/>
-                <path d="M17 24h14M24 17v14" stroke="url(#scan-stroke)" strokeWidth="2" strokeLinecap="round"/>
-                <circle cx="24" cy="24" r="3" fill="url(#scan-stroke)"/>
-                <path d="M10 10l5 5M38 10l-5 5M10 38l5-5M38 38l-5-5" stroke="url(#scan-stroke)" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-                <defs>
-                    <linearGradient id="scan-bg" x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#606beb"/>
-                        <stop offset="1" stopColor="#818cf8"/>
-                    </linearGradient>
-                    <linearGradient id="scan-stroke" x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#606beb"/>
-                        <stop offset="1" stopColor="#818cf8"/>
-                    </linearGradient>
-                </defs>
-            </svg>
-        ),
-        title: "AI Deep Analysis",
-        description: "Resumer AI engine parses your resume against ATS algorithms, evaluating structure, keywords, formatting, and content quality in seconds.",
-    },
-    {
-        number: "03",
-        icon: (
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-10 h-10">
-                <rect x="6" y="30" width="6" height="12" rx="2" fill="url(#bar-grad-1)"/>
-                <rect x="15" y="20" width="6" height="22" rx="2" fill="url(#bar-grad-2)"/>
-                <rect x="24" y="24" width="6" height="18" rx="2" fill="url(#bar-grad-3)"/>
-                <rect x="33" y="12" width="6" height="30" rx="2" fill="url(#bar-grad-4)"/>
-                <path d="M6 28l9-8 9 4 12-14" stroke="#606beb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                <circle cx="6" cy="28" r="2" fill="#606beb"/>
-                <circle cx="15" cy="20" r="2" fill="#606beb"/>
-                <circle cx="24" cy="24" r="2" fill="#606beb"/>
-                <circle cx="36" cy="14" r="2" fill="#606beb"/>
-                <defs>
-                    <linearGradient id="bar-grad-1" x1="6" y1="30" x2="12" y2="42" gradientUnits="userSpaceOnUse"><stop stopColor="#c7d2fe"/><stop offset="1" stopColor="#818cf8"/></linearGradient>
-                    <linearGradient id="bar-grad-2" x1="15" y1="20" x2="21" y2="42" gradientUnits="userSpaceOnUse"><stop stopColor="#a5b4fc"/><stop offset="1" stopColor="#606beb"/></linearGradient>
-                    <linearGradient id="bar-grad-3" x1="24" y1="24" x2="30" y2="42" gradientUnits="userSpaceOnUse"><stop stopColor="#818cf8"/><stop offset="1" stopColor="#4957eb"/></linearGradient>
-                    <linearGradient id="bar-grad-4" x1="33" y1="12" x2="39" y2="42" gradientUnits="userSpaceOnUse"><stop stopColor="#606beb"/><stop offset="1" stopColor="#3730a3"/></linearGradient>
-                </defs>
-            </svg>
-        ),
-        title: "Instant ATS Score & Feedback",
-        description: "Receive your Resumer compatibility score along with detailed, actionable feedback — exactly what hiring systems and recruiters look for.",
-    },
-    {
-        number: "04",
-        icon: (
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-10 h-10">
-                <circle cx="24" cy="16" r="10" fill="url(#improve-grad)" opacity="0.15"/>
-                <circle cx="24" cy="16" r="10" stroke="url(#improve-grad)" strokeWidth="2" fill="none"/>
-                <path d="M20 16l3 3 5-5" stroke="url(#improve-grad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 32h24" stroke="url(#improve-grad)" strokeWidth="2" strokeLinecap="round"/>
-                <path d="M15 37h18" stroke="url(#improve-grad)" strokeWidth="2" strokeLinecap="round" opacity="0.5"/>
-                <path d="M8 28c0-3 2-5 4-6" stroke="url(#improve-grad)" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
-                <path d="M40 28c0-3-2-5-4-6" stroke="url(#improve-grad)" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
-                <defs>
-                    <linearGradient id="improve-grad" x1="8" y1="8" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#f59e0b"/>
-                        <stop offset="1" stopColor="#d97706"/>
-                    </linearGradient>
-                </defs>
-            </svg>
-        ),
-        title: "Areas of Improvement",
-        description: "Pinpoint exactly where your resume falls short from missing keywords to weak impact statements with clear, prioritized suggestions.",
-    },
-    {
-        number: "05",
-        icon: (
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-10 h-10">
-                <rect x="6" y="10" width="36" height="28" rx="4" fill="url(#job-bg)" opacity="0.12"/>
-                <rect x="6" y="10" width="36" height="28" rx="4" stroke="url(#job-stroke)" strokeWidth="2" fill="none"/>
-                <circle cx="18" cy="24" r="5" fill="url(#job-stroke)" opacity="0.2"/>
-                <circle cx="18" cy="24" r="5" stroke="url(#job-stroke)" strokeWidth="1.5" fill="none"/>
-                <path d="M15 24l2 2 4-4" stroke="url(#job-stroke)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="27" y="19" width="10" height="2" rx="1" fill="url(#job-stroke)" opacity="0.8"/>
-                <rect x="27" y="23" width="8" height="2" rx="1" fill="url(#job-stroke)" opacity="0.6"/>
-                <rect x="27" y="27" width="9" height="2" rx="1" fill="url(#job-stroke)" opacity="0.4"/>
-                <path d="M18 6v4M30 6v4" stroke="url(#job-stroke)" strokeWidth="2" strokeLinecap="round" opacity="0.5"/>
-                <defs>
-                    <linearGradient id="job-bg" x1="6" y1="10" x2="42" y2="38" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#10b981"/>
-                        <stop offset="1" stopColor="#059669"/>
-                    </linearGradient>
-                    <linearGradient id="job-stroke" x1="6" y1="10" x2="42" y2="38" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#10b981"/>
-                        <stop offset="1" stopColor="#059669"/>
-                    </linearGradient>
-                </defs>
-            </svg>
-        ),
-        title: "Best-Fit Job Matches",
-        description: "Get job recommendations matched to your unique skill set, experience, and career profile — so you apply smarter, not harder.",
-    },
+const STEPS: Array<[string, string, string, string]> = [
+  ["01", "Drop", "Upload your resume as PDF or DOCX. Any standard format up to 20 MB.", "00.1s"],
+  ["02", "Parse", "We read structure, keywords, formatting, and prose with the same eye an ATS does.", "01.2s"],
+  ["03", "Score", "A single ATS compatibility score, plus four sub-scores graded 0–100.", "02.5s"],
+  ["04", "Edit", "We pinpoint missing keywords, weak verbs, soft impact statements.", "03.8s"],
+  ["05", "Match", "Curated job recommendations ranked by alignment with your profile.", "06.4s"],
 ];
 
+const THUMB_LINES = ["h", "l", "m", "s", "l", "m", "l", "s", "m", "l", "h", "l"];
+
+type RealResume = Resume & { createdAt?: number };
+
+function relativeTime(timestamp?: number): string {
+  if (!timestamp) return "Recently";
+  const diff = Date.now() - timestamp;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)} week${days >= 14 ? "s" : ""} ago`;
+  return `${Math.floor(days / 30)} mo. ago`;
+}
+
+function HeroCard() {
+  const navigate = useNavigate();
+  return (
+    <div className="hero-card">
+      <div className="hero-card-bar">
+        <div className="dots">
+          <span /><span /><span />
+        </div>
+        <span className="pulse">Engine online</span>
+      </div>
+      <div className="hero-card-body">
+        <div
+          className="hero-card-row dropzone"
+          onClick={() => navigate("/upload")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") navigate("/upload");
+          }}
+        >
+          <div className="file-icon">PDF</div>
+          <div>
+            <div className="ttl">Drop your resume here</div>
+            <div className="sub">PDF or DOCX · up to 20 MB</div>
+          </div>
+        </div>
+        <div className="hero-card-fields">
+          <div className="hc-field">
+            <label>Target role</label>
+            <input defaultValue="ML Engineer" />
+          </div>
+          <div className="hc-field">
+            <label>Company</label>
+            <input defaultValue="Anthropic" />
+          </div>
+        </div>
+      </div>
+      <div className="hero-card-foot">
+        <span className="meta">
+          Median runtime · <strong>8 seconds</strong>
+        </span>
+        <button className="btn-primary" onClick={() => navigate("/upload")} type="button">
+          Run analysis <ArrowRight size={14} strokeWidth={1.75} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Hero() {
+  const navigate = useNavigate();
+  return (
+    <section className="hero">
+      <div className="hero-grid">
+        <div>
+          <span className="hero-pill">
+            <span className="badge">New</span>
+            Now scoring against 38 industry models
+          </span>
+          <h1 className="hero-title">
+            Your resume,<br />
+            <span className="muted">read closely.</span>
+          </h1>
+          <p className="hero-lead">
+            A patient second pair of eyes for the document that opens every
+            door. We score it the way an ATS does, then tell you — in plain
+            English — exactly what to fix.
+          </p>
+          <div className="hero-actions">
+            <button className="btn-primary lg" type="button" onClick={() => navigate("/upload")}>
+              Analyze your resume
+              <ArrowRight size={15} strokeWidth={1.75} />
+            </button>
+            <button className="btn-ghost" type="button" onClick={() => navigate("/upload")}>
+              See sample report →
+            </button>
+          </div>
+          <div className="hero-trust">
+            <span><strong>184k+</strong> resumes scored</span>
+            <span className="sep" />
+            <span><strong>+27%</strong> avg. callback lift</span>
+            <span className="sep" />
+            <span><strong>8s</strong> median runtime</span>
+          </div>
+        </div>
+        <HeroCard />
+      </div>
+    </section>
+  );
+}
+
+function Steps() {
+  return (
+    <section className="section alt">
+      <div className="section-inner">
+        <SectionHead
+          numeral="II"
+          eyebrow="— No. 002 / Method"
+          title={
+            <>
+              From upload to offer letter,{" "}
+              <span className="muted">in five reads.</span>
+            </>
+          }
+          sub="Five deliberate steps that turn your resume into your strongest career asset. No chat-bot rambling. Just signal."
+        />
+        <div className="steps">
+          {STEPS.map(([n, t, d, time]) => (
+            <div className="step" key={n}>
+              <div className="num-row">
+                <span className="num">{n}</span>
+                <span className="check">
+                  <Check size={11} strokeWidth={2.5} />
+                </span>
+              </div>
+              <h3>{t}</h3>
+              <p>{d}</p>
+              <div className="step-tag">
+                <span className="dot" />~{time}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ResumeCard({ resume }: { resume: RealResume }) {
+  const { fs } = usePuterStore();
+  const [imageUrl, setImageUrl] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    let createdUrl = "";
+
+    async function load() {
+      if (!resume.imagePath) return;
+      try {
+        const blob = await fs.read(resume.imagePath);
+        if (!blob || cancelled) return;
+        createdUrl = URL.createObjectURL(blob);
+        setImageUrl(createdUrl);
+      } catch (err) {
+        console.warn("ResumeCard: failed to read image", resume.imagePath, err);
+      }
+    }
+    load();
+
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [fs, resume.imagePath]);
+
+  const score = Math.round(
+    resume.feedback?.overallScore ?? resume.feedback?.ATS?.score ?? 0
+  );
+  const accent = score > 75 ? "hi" : score < 60 ? "lo" : "";
+  const status = score >= 90 ? "TOP MATCH" : undefined;
+  const when = relativeTime(resume.createdAt);
+
+  return (
+    <Link to={`/resume/${resume.id}`} className="resume-card">
+      <div className="resume-card-head">
+        <div>
+          <div className="co">{resume.companyName || "Untitled"}</div>
+          <div className="role">{resume.jobTitle || "Role"}</div>
+        </div>
+        <div className={`resume-score ${accent}`}>{score}</div>
+      </div>
+      <div className="resume-card-body">
+        <div className={`resume-thumb ${imageUrl ? "has-img" : ""}`}>
+          {status && <span className="stamp">{status}</span>}
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={`${resume.companyName || "Resume"} preview`}
+              className="resume-thumb-img"
+              loading="lazy"
+            />
+          ) : (
+            <>
+              <div className="ln h" />
+              <div className="ln s" />
+              <div className="col2">
+                <div className="ln" />
+                <div className="ln" />
+              </div>
+              <div style={{ height: 4 }} />
+              <div className="ln h" style={{ width: "30%" }} />
+              {THUMB_LINES.map((l, i) => (
+                <div key={i} className={`ln ${l}`} />
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+      <div className="resume-card-foot">
+        <span>{when}</span>
+        <span className="arrow">
+          Review <ArrowRight size={11} strokeWidth={1.75} />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function Resumes({
+  resumes,
+  loading,
+}: {
+  resumes: RealResume[];
+  loading: boolean;
+}) {
+  const [tab, setTab] = useState<"recent" | "high" | "all">("recent");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 4;
+
+  const sorted = useMemo(() => {
+    if (tab === "high") {
+      return [...resumes].sort((a, b) => {
+        const sa = a.feedback?.overallScore ?? 0;
+        const sb = b.feedback?.overallScore ?? 0;
+        return sb - sa;
+      });
+    }
+    // Recent / All — already sorted by createdAt desc
+    return resumes;
+  }, [resumes, tab]);
+
+  const total = sorted.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Clamp page if dataset shrinks
+  const safePage = Math.min(page, pages - 1);
+
+  // Group into pages of PAGE_SIZE for the slide-track
+  const pageGroups = useMemo(() => {
+    const out: RealResume[][] = [];
+    for (let i = 0; i < sorted.length; i += PAGE_SIZE) {
+      out.push(sorted.slice(i, i + PAGE_SIZE));
+    }
+    return out.length === 0 ? [[]] : out;
+  }, [sorted]);
+
+  return (
+    <section className="section">
+      <div className="section-inner">
+        <SectionHead
+          numeral="III"
+          eyebrow="— No. 003 / Archive"
+          title={
+            total === 0 && !loading ? (
+              <>No resumes <span className="muted">yet.</span></>
+            ) : (
+              <>Your analyzed <span className="muted">resumes.</span></>
+            )
+          }
+          sub={
+            total === 0 && !loading
+              ? "Upload your first resume to start tracking ATS scores and feedback across roles."
+              : "Every submission is preserved. Re-open feedback, compare scores across roles, or duplicate a winning version."
+          }
+        />
+
+        {loading ? (
+          <div
+            style={{
+              padding: "60px 0",
+              color: "var(--ink-4)",
+              fontFamily: "var(--mono)",
+              fontSize: 12,
+              letterSpacing: ".08em",
+              textTransform: "uppercase",
+            }}
+          >
+            Loading archive…
+          </div>
+        ) : total === 0 ? (
+          <div style={{ padding: "20px 0 0" }}>
+            <Link to="/upload" className="btn-primary lg">
+              Upload your first resume
+              <ArrowRight size={15} strokeWidth={1.75} />
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="resumes-toolbar">
+              <div className="toolbar-tabs">
+                {([
+                  ["recent", "Recent"],
+                  ["high", "Highest"],
+                  ["all", `All ${total}`],
+                ] as const).map(([k, l]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className={tab === k ? "active" : ""}
+                    onClick={() => {
+                      setTab(k);
+                      setPage(0);
+                    }}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div className="carousel-controls">
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={safePage === 0}
+                  aria-label="Previous"
+                >
+                  <ArrowLeft size={14} strokeWidth={1.75} />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() =>
+                    setPage((p) => Math.min(pages - 1, p + 1))
+                  }
+                  disabled={safePage >= pages - 1}
+                  aria-label="Next"
+                >
+                  <ArrowRight size={14} strokeWidth={1.75} />
+                </button>
+              </div>
+            </div>
+
+            <div className="resumes-track-wrap">
+              <div
+                className="resumes-track"
+                style={{ transform: `translateX(-${safePage * 100}%)` }}
+              >
+                {pageGroups.map((group, gi) => (
+                  <div className="resumes-page" key={gi}>
+                    {group.map((r) => (
+                      <ResumeCard key={r.id} resume={r} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
-    const { auth, kv } = usePuterStore();
-    const navigate = useNavigate();
-    const [resumes, setResumes] = useState<Resume[]>([]);
-    const [loadingResumes, setLoadingResumes] = useState(false);
-    const [showResumes, setShowResumes] = useState(true);
+  const { auth, kv, isLoading } = usePuterStore();
+  const navigate = useNavigate();
+  const [resumes, setResumes] = useState<RealResume[]>([]);
+  const [loadingResumes, setLoadingResumes] = useState(true);
 
-    useEffect(() => {
-        if (!auth.isAuthenticated) navigate('/auth?next=/');
-    }, [auth.isAuthenticated]);
+  useEffect(() => {
+    if (!isLoading && !auth.isAuthenticated) navigate("/auth?next=/");
+  }, [auth.isAuthenticated, isLoading]);
 
-    useEffect(() => {
-        const loadResumes = async () => {
-            setLoadingResumes(true);
-            const resumes = (await kv.list('resume:*', true)) as KVItem[];
-            const parsedResumes = resumes?.map((resume) => (
-                JSON.parse(resume.value) as Resume
-            ));
-            setResumes(parsedResumes || []);
-            setLoadingResumes(false);
-        };
-        loadResumes();
-    }, []);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadResumes() {
+      setLoadingResumes(true);
+      try {
+        const records = (await kv.list("resume:*", true)) as KVItem[] | null;
+        if (cancelled) return;
+        const parsed: RealResume[] = (records || [])
+          .map((r) => {
+            try {
+              return JSON.parse(r.value) as RealResume;
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean) as RealResume[];
 
-    return (
-        <main className="bg-[url('/images/bg-main.svg')] bg-cover">
-            <Navbar />
+        // Historical order — newest first
+        parsed.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 
-            <section className="main-section">
-                {/* ── Hero ── */}
-                <div className="w-full max-w-[1400px] grid grid-cols-1 lg:grid-cols-2 gap-12 items-center pt-6">
-                    {/* Left column */}
-                    <div className="flex flex-col gap-8 max-lg:items-center max-lg:text-center">
-                        <h1 className="!text-7xl max-md:!text-6xl">Resumer</h1>
-                        <p className="text-xl text-dark-200 max-w-xl leading-relaxed">
-                            Your AI-powered resume coach. Get an instant ATS score,
-                            personalized feedback, and curated job matches tailored
-                            to your profile — all in seconds.
-                        </p>
+        if (!cancelled) setResumes(parsed);
+      } catch (err) {
+        console.warn("home: failed to load resumes", err);
+      } finally {
+        if (!cancelled) setLoadingResumes(false);
+      }
+    }
 
-                        <div className="gradient-border w-full max-w-xl">
-                            <div className="flex flex-col sm:flex-row items-center gap-5 p-5 bg-white rounded-2xl">
-                                <Link
-                                    to="/upload"
-                                    className="primary-gradient hover:[background:var(--tw-gradient-stops),linear-gradient(to_bottom,#717dff,#4957eb)] text-white font-semibold rounded-full px-8 py-4 whitespace-nowrap shadow-[0_8px_24px_-8px_rgba(96,107,235,0.6)] hover:shadow-[0_12px_28px_-8px_rgba(96,107,235,0.8)] transition-all duration-300"
-                                >
-                                    Get Your Score
-                                </Link>
-                                <div className="flex flex-col text-sm text-dark-200">
-                                    <span className="font-semibold text-gray-800">Upload your resume</span>
-                                    <span>PDF format (max 20MB).</span>
-                                </div>
-                            </div>
-                        </div>
+    if (!isLoading && auth.isAuthenticated) {
+      loadResumes();
+    } else if (!isLoading && !auth.isAuthenticated) {
+      setLoadingResumes(false);
+    }
 
-                        <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 text-dark-200 text-sm">
-                            {["Instant ATS scoring", "AI-powered feedback", "Curated job matches"].map((label) => (
-                                <span key={label} className="flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-[#606beb]" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7 7a1 1 0 01-1.4 0l-3-3a1 1 0 111.4-1.4L9 11.6l6.3-6.3a1 1 0 011.4 0z" clipRule="evenodd" />
-                                    </svg>
-                                    {label}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
+    return () => {
+      cancelled = true;
+    };
+  }, [kv, auth.isAuthenticated, isLoading]);
 
-                    {/* Right column — bigger image, aligned with text height */}
-                    <div className="relative flex items-center justify-center self-stretch min-h-[580px]">
-                        <div className="absolute inset-0 bg-gradient-to-br from-light-blue-100 to-light-blue-200 blur-3xl opacity-60 rounded-full" />
-                        <img
-                            src="/images/home-ui.png"
-                            alt="Resumer application preview"
-                            className="relative w-full h-full max-w-none object-contain drop-shadow-[0_25px_45px_rgba(96,107,235,0.25)]"
-                            style={{ minHeight: "520px", maxHeight: "680px" }}
-                        />
-                    </div>
-                </div>
-
-                {/* ── Resume History ── */}
-                <div className="w-full max-w-[1850px] flex flex-col items-center gap-6 mt-20 pt-12 border-t border-gray-200">
-                    {/* Header row */}
-                    <div className="w-full flex flex-col items-center gap-2 text-center">
-                        <h2 className="!text-4xl max-sm:!text-2xl text-dark-200 font-bold">
-                            {!loadingResumes && resumes?.length === 0
-                                ? "No resumes yet"
-                                : "Your analyzed resumes"}
-                        </h2>
-                        <p className="text-dark-200 max-w-2xl">
-                            {!loadingResumes && resumes?.length === 0
-                                ? "Upload your first resume to start getting AI-powered feedback and job recommendations."
-                                : "Review your previous submissions and revisit AI feedback any time."}
-                        </p>
-                    </div>
-
-                    {loadingResumes && (
-                        <div className="flex flex-col items-center justify-center">
-                            <img src="/images/resume-scan-2.gif" className="w-[200px]" />
-                        </div>
-                    )}
-
-                    {!loadingResumes && resumes.length > 0 && showResumes && (
-                        <div className="w-full">
-                            <ResumeCarousel resumes={resumes} />
-                        </div>
-                    )}
-
-                    {!loadingResumes && resumes.length === 0 && (
-                        <Link
-                            to="/upload"
-                            className="primary-button w-fit text-xl font-semibold mt-2"
-                        >
-                            Upload your first resume
-                        </Link>
-                    )}
-
-                    {/* Show less / show more toggle */}
-                    {!loadingResumes && resumes.length > 0 && (
-                        <button
-                            onClick={() => setShowResumes((v) => !v)}
-                            className="flex items-center gap-2 text-sm font-semibold text-[#606beb] hover:text-[#4957eb] border border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50 rounded-full px-6 py-2.5 transition-all duration-200 shadow-sm mt-2"
-                        >
-                            <svg
-                                className={`w-4 h-4 transition-transform duration-300 ${showResumes ? "rotate-180" : "rotate-0"}`}
-                                viewBox="0 0 20 20" fill="currentColor"
-                            >
-                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/>
-                            </svg>
-                            {showResumes ? "Show less" : "Show resumes"}
-                        </button>
-                    )}
-                </div>
-
-                {/* ── How It Works ── */}
-                <div className="w-full max-w-[1400px] flex flex-col items-center gap-10 mt-24 pt-14 border-t border-gray-200 pb-20">
-                    {/* Section header */}
-                    <div className="flex flex-col items-center gap-3 text-center">
-                        <span className="inline-flex items-center gap-2 text-[#606beb] text-sm font-semibold tracking-widest uppercase px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-100">
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2a5 5 0 110 10A5 5 0 018 3zm0 2a3 3 0 100 6 3 3 0 000-6z"/>
-                            </svg>
-                            How It Works
-                        </span>
-                        <h2 className="!text-4xl max-sm:!text-2xl font-bold text-gray-900">
-                            From upload to opportunity
-                        </h2>
-                        <p className="text-dark-200 max-w-xl text-base leading-relaxed">
-                            Five simple steps that turn your resume into your strongest career asset.
-                        </p>
-                    </div>
-
-                    {/* Steps grid */}
-                    <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
-                        {steps.map((step, index) => (
-                            <div
-                                key={step.number}
-                                className="group relative flex flex-col items-center gap-4 p-6 bg-white rounded-2xl border border-gray-100 shadow-[0_2px_16px_-4px_rgba(96,107,235,0.08)] hover:shadow-[0_8px_32px_-8px_rgba(96,107,235,0.2)] hover:-translate-y-1 transition-all duration-300 text-center"
-                            >
-                                {/* Connector line (hidden on last card and small screens) */}
-                                {index < steps.length - 1 && (
-                                    <span className="hidden xl:block absolute top-[52px] -right-[10px] w-5 border-t-2 border-dashed border-indigo-200 z-10" />
-                                )}
-
-                                {/* Step number badge — centered */}
-                                <span className="text-[11px] font-bold tracking-widest text-[#606beb] bg-indigo-50 border border-indigo-100 rounded-full px-3 py-0.5 leading-5 group-hover:bg-indigo-100 transition-colors duration-200">
-                                    {step.number}
-                                </span>
-
-                                {/* Icon — centered */}
-                                <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] group-hover:shadow-[0_4px_16px_-4px_rgba(96,107,235,0.25)] transition-all duration-300">
-                                    {step.icon}
-                                </div>
-
-                                {/* Text */}
-                                <div className="flex flex-col gap-2 w-full">
-                                    <h3 className="font-bold text-gray-900 text-base leading-snug text-center">
-                                        {step.title}
-                                    </h3>
-                                    <p className="text-sm text-dark-200 leading-relaxed text-justify">
-                                        {step.description}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* CTA */}
-                    <Link
-                        to="/upload"
-                        className="primary-gradient text-white font-semibold rounded-full px-10 py-4 mt-2 shadow-[0_8px_24px_-8px_rgba(96,107,235,0.55)] hover:shadow-[0_12px_28px_-8px_rgba(96,107,235,0.75)] hover:scale-[1.03] transition-all duration-300 inline-block"
-                    >
-                        Start for free →
-                    </Link>
-                </div>
-            </section>
-        </main>
-    );
+  return (
+    <Shell>
+      <Hero />
+      <Steps />
+      <Resumes resumes={resumes} loading={loadingResumes} />
+    </Shell>
+  );
 }
