@@ -4,7 +4,15 @@ export function Footer() {
       <div className="footer-inner">
         <img src="/resumer-white.png" alt="Resumer" className="footer-logo" />
         <h2 className="footer-mark">
-          Make it <span className="muted">read.</span>
+          Make it{" "}
+          <span className="muted footer-mark-tail">
+            <img
+              src="/resumer-grey.png"
+              alt=""
+              aria-hidden="true"
+              className="footer-mark-r"
+            />ead.
+          </span>
         </h2>
         <div className="footer-grid">
           <div>

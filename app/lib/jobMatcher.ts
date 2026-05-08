@@ -1,7 +1,12 @@
+export interface JobSkill {
+    name: string;
+    matched: boolean;
+}
+
 export interface JobCard {
     role: string;
     company: string;
-    skills: string[];
+    skills: JobSkill[];
     location: string;
     url: string;
     score: number;
@@ -95,9 +100,20 @@ async function fetchJSearch(searchQuery: string, apiKey: string): Promise<JSearc
     return Array.isArray(body?.data) ? (body.data as JSearchJob[]) : [];
 }
 
+// Skill is "matched" if at least one meaningful keyword (length ≥ 4 chars,
+// non-stopword — so generic words like "team" or "year" don't trigger
+// false positives) from the qualification text appears in the resume.
+function matchSkill(skillText: string, resumeTokenSet: Set<string>): boolean {
+    const tokens = tokenize(skillText).filter((t) => t.length >= 4);
+    if (tokens.length === 0) return false;
+    return tokens.some((t) => resumeTokenSet.has(t));
+}
+
 function rankJobs(resumeText: string, jobs: JSearchJob[]): JobCard[] {
     const resumeTokens = tokenize(resumeText);
     if (resumeTokens.length === 0 || jobs.length === 0) return [];
+
+    const resumeTokenSet = new Set(resumeTokens);
 
     const docs = jobs
         .map((job) => ({
@@ -126,7 +142,12 @@ function rankJobs(resumeText: string, jobs: JSearchJob[]): JobCard[] {
         const score = cosine(resumeVec, jobVec);
 
         const quals = job.job_highlights?.Qualifications;
-        const skills = Array.isArray(quals) ? quals.slice(0, 3) : [];
+        const skills: JobSkill[] = Array.isArray(quals)
+            ? quals.slice(0, 3).map((q) => ({
+                  name: q,
+                  matched: matchSkill(q, resumeTokenSet),
+              }))
+            : [];
         const locParts = [job.job_city, job.job_country].filter(Boolean) as string[];
         const location = locParts.length ? locParts.join(", ") : job.job_location || "Remote";
 

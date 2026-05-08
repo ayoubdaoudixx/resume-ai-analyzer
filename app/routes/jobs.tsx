@@ -102,24 +102,44 @@ export default function JobsPage() {
         const allReco = parsed.flatMap((p) => p.recommendedJobs || []).filter(Boolean);
         if (allReco.length === 0) return;
 
-        const sorted = allReco
-          .map((j: any, i: number) => {
-            const matchPct = Math.max(0, Math.min(100, Math.round(Number(j.score ?? 0) * 100)));
-            const chips: ChipTuple[] = (Array.isArray(j.skills) ? j.skills.slice(0, 4) : []).map(
-              (s: string) => [s, true] as ChipTuple
-            );
-            return {
-              company: j.company || "Untitled",
-              role: j.role || "Role",
-              location: j.location || "—",
-              match: matchPct,
-              type: "Full-time",
-              salary: j.salary || "—",
-              url: j.url || "#",
-              chips,
-              featured: i === 0,
-            } as JobRow;
-          })
+        const mapped: JobRow[] = allReco.map((j: any) => {
+          const matchPct = Math.max(0, Math.min(100, Math.round(Number(j.score ?? 0) * 100)));
+          // New shape: { name, matched }. Legacy (old kv records): plain string —
+          // treat as matched=true since we can't recompute without the resume text.
+          const chips: ChipTuple[] = (Array.isArray(j.skills) ? j.skills.slice(0, 4) : []).map(
+            (s: any): ChipTuple =>
+              typeof s === "string"
+                ? [s, true]
+                : [String(s?.name || ""), Boolean(s?.matched)]
+          );
+          return {
+            company: j.company || "Untitled",
+            role: j.role || "Role",
+            location: j.location || "—",
+            match: matchPct,
+            type: "Full-time",
+            salary: j.salary || "—",
+            url: j.url || "#",
+            chips,
+            featured: false,
+          } as JobRow;
+        });
+
+        // Dedupe by job_apply_link (unique per posting); fall back to
+        // company+role when url is missing. When the same posting was
+        // recommended for multiple resumes, keep the highest match score.
+        const dedupKey = (j: JobRow) =>
+          j.url && j.url !== "#"
+            ? j.url
+            : `${j.company.toLowerCase()}|${j.role.toLowerCase()}`;
+        const byKey = new Map<string, JobRow>();
+        for (const job of mapped) {
+          const key = dedupKey(job);
+          const existing = byKey.get(key);
+          if (!existing || job.match > existing.match) byKey.set(key, job);
+        }
+
+        const sorted = Array.from(byKey.values())
           .sort((a, b) => b.match - a.match)
           .map((j, i) => ({ ...j, featured: i === 0 }));
 
