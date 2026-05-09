@@ -10,6 +10,10 @@ export interface JobCard {
     location: string;
     url: string;
     score: number;
+    salary: string;
+    employmentType: string;
+    employerLogo: string;
+    postedAt: string;
 }
 
 interface JSearchJob {
@@ -17,10 +21,19 @@ interface JSearchJob {
     job_title?: string;
     job_description?: string;
     employer_name?: string;
+    employer_logo?: string;
     job_city?: string;
     job_country?: string;
     job_location?: string;
     job_apply_link?: string;
+    job_employment_type?: string;
+    job_is_remote?: boolean;
+    job_min_salary?: number;
+    job_max_salary?: number;
+    job_salary_currency?: string;
+    job_salary_period?: string;
+    job_posted_at_datetime_utc?: string;
+    job_required_skills?: string[];
     job_highlights?: { Qualifications?: string[] };
 }
 
@@ -100,13 +113,144 @@ async function fetchJSearch(searchQuery: string, apiKey: string): Promise<JSearc
     return Array.isArray(body?.data) ? (body.data as JSearchJob[]) : [];
 }
 
-// Skill is "matched" if at least one meaningful keyword (length ≥ 4 chars,
-// non-stopword — so generic words like "team" or "year" don't trigger
-// false positives) from the qualification text appears in the resume.
-function matchSkill(skillText: string, resumeTokenSet: Set<string>): boolean {
-    const tokens = tokenize(skillText).filter((t) => t.length >= 4);
-    if (tokens.length === 0) return false;
-    return tokens.some((t) => resumeTokenSet.has(t));
+// Canonical short-name skills. Each entry is [display, ...aliases]: any alias
+// found in the job text surfaces the display label as a chip. Lowercased
+// matching against tokenized text, so multi-word aliases use a single token
+// (e.g. "nodejs"). Phrases like "node.js" tokenize to "node" + "js" so we
+// list both forms.
+const SKILL_VOCAB: Array<[string, ...string[]]> = [
+    ["Python", "python"],
+    ["JavaScript", "javascript", "js"],
+    ["TypeScript", "typescript", "ts"],
+    ["React", "react", "reactjs"],
+    ["Next.js", "nextjs", "next"],
+    ["Vue", "vue", "vuejs"],
+    ["Angular", "angular"],
+    ["Node.js", "nodejs", "node"],
+    ["Express", "express", "expressjs"],
+    ["Django", "django"],
+    ["Flask", "flask"],
+    ["FastAPI", "fastapi"],
+    ["Java", "java"],
+    ["Kotlin", "kotlin"],
+    ["Swift", "swift"],
+    ["Go", "golang"],
+    ["Rust", "rust"],
+    ["C++", "cpp"],
+    ["C#", "csharp"],
+    ["Ruby", "ruby"],
+    ["Rails", "rails"],
+    ["PHP", "php"],
+    ["Laravel", "laravel"],
+    ["SQL", "sql"],
+    ["PostgreSQL", "postgres", "postgresql"],
+    ["MySQL", "mysql"],
+    ["MongoDB", "mongodb", "mongo"],
+    ["Redis", "redis"],
+    ["GraphQL", "graphql"],
+    ["REST", "rest", "restful"],
+    ["AWS", "aws"],
+    ["GCP", "gcp"],
+    ["Azure", "azure"],
+    ["Docker", "docker"],
+    ["Kubernetes", "kubernetes", "k8s"],
+    ["Terraform", "terraform"],
+    ["CI/CD", "cicd"],
+    ["Git", "git"],
+    ["Linux", "linux"],
+    ["HTML", "html"],
+    ["CSS", "css"],
+    ["Tailwind", "tailwind", "tailwindcss"],
+    ["Sass", "sass", "scss"],
+    ["PyTorch", "pytorch"],
+    ["TensorFlow", "tensorflow"],
+    ["Pandas", "pandas"],
+    ["NumPy", "numpy"],
+    ["Scikit-learn", "sklearn", "scikit"],
+    ["LLM", "llm", "llms"],
+    ["RAG", "rag"],
+    ["NLP", "nlp"],
+    ["Machine Learning", "ml"],
+    ["Deep Learning", "dl"],
+    ["Computer Vision", "vision"],
+    ["LangChain", "langchain"],
+    ["Spark", "spark"],
+    ["Kafka", "kafka"],
+    ["Airflow", "airflow"],
+    ["Hadoop", "hadoop"],
+    ["Snowflake", "snowflake"],
+    ["dbt", "dbt"],
+    ["Figma", "figma"],
+    ["Agile", "agile"],
+    ["Scrum", "scrum"],
+    ["Jira", "jira"],
+];
+
+// Used when a posting includes the structured `job_required_skills` array —
+// we trust that as the chip source and just decide matched/unmatched.
+function skillsFromRequired(
+    required: string[],
+    resumeTokenSet: Set<string>
+): JobSkill[] {
+    const seen = new Set<string>();
+    const out: JobSkill[] = [];
+    for (const raw of required) {
+        const name = String(raw || "").trim();
+        if (!name) continue;
+        const key = name.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const tokens = tokenize(name);
+        const matched = tokens.length > 0 && tokens.some((t) => resumeTokenSet.has(t));
+        out.push({ name, matched });
+    }
+    out.sort((a, b) => Number(b.matched) - Number(a.matched));
+    return out.slice(0, 5);
+}
+
+function extractSkills(
+    jobText: string,
+    resumeTokenSet: Set<string>
+): JobSkill[] {
+    const jobTokenSet = new Set(tokenize(jobText));
+    const skills: JobSkill[] = [];
+    const seen = new Set<string>();
+    for (const [label, ...aliases] of SKILL_VOCAB) {
+        if (seen.has(label)) continue;
+        const inJob = aliases.some((a) => jobTokenSet.has(a));
+        if (!inJob) continue;
+        const matched = aliases.some((a) => resumeTokenSet.has(a));
+        skills.push({ name: label, matched });
+        seen.add(label);
+    }
+    // Prefer matched skills first so the user sees their wins, then fill with
+    // unmatched. Cap at 5 chips — the table column is narrow.
+    skills.sort((a, b) => Number(b.matched) - Number(a.matched));
+    return skills.slice(0, 5);
+}
+
+function formatSalary(job: JSearchJob): string {
+    const min = Number(job.job_min_salary) || 0;
+    const max = Number(job.job_max_salary) || 0;
+    if (!min && !max) return "—";
+    const currency = (job.job_salary_currency || "USD").toUpperCase();
+    const symbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : "";
+    const round = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}K` : `${Math.round(n)}`);
+    const period = (job.job_salary_period || "").toUpperCase();
+    const suffix = period === "HOUR" ? "/hr" : period === "MONTH" ? "/mo" : "";
+    const prefix = symbol || `${currency} `;
+    if (min && max && min !== max) return `${prefix}${round(min)}–${round(max)}${suffix}`;
+    return `${prefix}${round(max || min)}${suffix}`;
+}
+
+function formatEmploymentType(raw?: string): string {
+    switch ((raw || "").toUpperCase()) {
+        case "FULLTIME": return "Full-time";
+        case "PARTTIME": return "Part-time";
+        case "CONTRACTOR": return "Contract";
+        case "INTERN": return "Internship";
+        default: return raw || "Full-time";
+    }
 }
 
 function rankJobs(resumeText: string, jobs: JSearchJob[]): JobCard[] {
@@ -142,14 +286,24 @@ function rankJobs(resumeText: string, jobs: JSearchJob[]): JobCard[] {
         const score = cosine(resumeVec, jobVec);
 
         const quals = job.job_highlights?.Qualifications;
-        const skills: JobSkill[] = Array.isArray(quals)
-            ? quals.slice(0, 3).map((q) => ({
-                  name: q,
-                  matched: matchSkill(q, resumeTokenSet),
-              }))
-            : [];
+        // Prefer the structured `job_required_skills` array when present —
+        // it's already a clean list. Fall back to vocabulary scan over the
+        // full posting text otherwise.
+        const skills =
+            Array.isArray(job.job_required_skills) && job.job_required_skills.length > 0
+                ? skillsFromRequired(job.job_required_skills, resumeTokenSet)
+                : extractSkills(
+                      [
+                          job.job_title || "",
+                          job.job_description || "",
+                          Array.isArray(quals) ? quals.join(" ") : "",
+                      ].join(" "),
+                      resumeTokenSet
+                  );
+
         const locParts = [job.job_city, job.job_country].filter(Boolean) as string[];
-        const location = locParts.length ? locParts.join(", ") : job.job_location || "Remote";
+        const baseLocation = locParts.length ? locParts.join(", ") : job.job_location || "Remote";
+        const location = job.job_is_remote ? `Remote · ${baseLocation}` : baseLocation;
 
         return {
             role: job.job_title || "",
@@ -158,6 +312,10 @@ function rankJobs(resumeText: string, jobs: JSearchJob[]): JobCard[] {
             location,
             url: job.job_apply_link || "",
             score: Number(score.toFixed(4)),
+            salary: formatSalary(job),
+            employmentType: formatEmploymentType(job.job_employment_type),
+            employerLogo: job.employer_logo || "",
+            postedAt: job.job_posted_at_datetime_utc || "",
         };
     });
 

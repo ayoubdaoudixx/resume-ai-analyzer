@@ -21,6 +21,8 @@ type JobRow = {
   url: string;
   chips: ChipTuple[];
   featured?: boolean;
+  logo?: string;
+  postedAt?: string;
 };
 
 const SAMPLE_JOBS: JobRow[] = [
@@ -61,8 +63,13 @@ function applyFilter(jobs: JobRow[], filter: string): JobRow[] {
       return jobs.filter((j) => /(senior|staff|lead|principal)/i.test(j.role));
     case "us":
       return jobs.filter((j) => /(US|NY|SF|CA|Remote · US)/.test(j.location));
-    case "new":
-      return jobs.slice(0, 4);
+    case "new": {
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      return jobs.filter((j) => {
+        const t = j.postedAt ? Date.parse(j.postedAt) : NaN;
+        return Number.isFinite(t) && t >= cutoff;
+      });
+    }
     default:
       return jobs;
   }
@@ -71,6 +78,30 @@ function applyFilter(jobs: JobRow[], filter: string): JobRow[] {
 function avgMatch(jobs: JobRow[]): number {
   if (jobs.length === 0) return 0;
   return Math.round(jobs.reduce((a, b) => a + b.match, 0) / jobs.length);
+}
+
+function relativePosted(iso?: string): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  const diff = Math.max(0, Date.now() - t);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diff < hour) {
+    const m = Math.max(1, Math.round(diff / minute));
+    return `${m} min${m === 1 ? "" : "s"} ago`;
+  }
+  if (diff < day) {
+    const h = Math.round(diff / hour);
+    return `${h} hour${h === 1 ? "" : "s"} ago`;
+  }
+  const days = Math.round(diff / day);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+  const years = Math.round(days / 365);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
 }
 
 export default function JobsPage() {
@@ -106,7 +137,7 @@ export default function JobsPage() {
           const matchPct = Math.max(0, Math.min(100, Math.round(Number(j.score ?? 0) * 100)));
           // New shape: { name, matched }. Legacy (old kv records): plain string —
           // treat as matched=true since we can't recompute without the resume text.
-          const chips: ChipTuple[] = (Array.isArray(j.skills) ? j.skills.slice(0, 4) : []).map(
+          const chips: ChipTuple[] = (Array.isArray(j.skills) ? j.skills.slice(0, 5) : []).map(
             (s: any): ChipTuple =>
               typeof s === "string"
                 ? [s, true]
@@ -117,11 +148,13 @@ export default function JobsPage() {
             role: j.role || "Role",
             location: j.location || "—",
             match: matchPct,
-            type: "Full-time",
+            type: j.employmentType || "Full-time",
             salary: j.salary || "—",
             url: j.url || "#",
             chips,
             featured: false,
+            logo: j.employerLogo || "",
+            postedAt: j.postedAt || "",
           } as JobRow;
         });
 
@@ -255,10 +288,28 @@ export default function JobsPage() {
                     className={j.featured ? "featured" : ""}
                   >
                     <td>
-                      <span className="role-name">{j.role}</span>
-                      <span className="role-meta">
-                        {j.company} · {j.location}
-                      </span>
+                      <div className="role-cell">
+                        <img
+                          className={`employer-logo${j.logo ? "" : " fallback"}`}
+                          src={j.logo || (j.featured ? "/resumer-white.png" : "/resumer-black.png")}
+                          alt=""
+                          loading="lazy"
+                          onError={(e) => {
+                            const img = e.currentTarget as HTMLImageElement;
+                            const fb = j.featured ? "/resumer-white.png" : "/resumer-black.png";
+                            if (img.src.endsWith(fb)) return;
+                            img.src = fb;
+                            img.classList.add("fallback");
+                          }}
+                        />
+                        <div className="role-text">
+                          <span className="role-name">{j.role}</span>
+                          <span className="role-meta">
+                            {j.company} · {j.location}
+                            {relativePosted(j.postedAt) ? ` · ${relativePosted(j.postedAt)}` : ""}
+                          </span>
+                        </div>
+                      </div>
                     </td>
                     <td>
                       <div className="skill-chips">

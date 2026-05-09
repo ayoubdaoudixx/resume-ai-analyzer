@@ -16,7 +16,7 @@ export function ScoreRing({ value = 82, size = 180 }: Props) {
   const off = c - (safe / 100) * c;
   return (
     <div className="score-ring" style={{ width: size, height: size }}>
-      <svg width={size} height={size}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle
           cx={size / 2}
           cy={size / 2}

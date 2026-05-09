@@ -9,7 +9,7 @@ import { usePuterStore } from "~/lib/puter";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Resumer — read closely" },
+    { title: "Resumer - Make It Read" },
     {
       name: "description",
       content:
