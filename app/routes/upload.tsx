@@ -9,9 +9,10 @@ import { convertPdfToImage } from "~/lib/pdf2img";
 import { generateUUID, formatSize } from "~/lib/utils";
 import { recommendJobs } from "~/lib/jobMatcher";
 import { prepareInstructions } from "../../constants";
+import { saveResume } from "~/lib/resumeStore";
 
 export const meta = () => [
-  { title: "Resumer — Submit" },
+  { title: "Resummary — Submit" },
   {
     name: "description",
     content: "Upload your résumé and target role for ATS-grade feedback.",
@@ -212,6 +213,7 @@ export default function UploadPage() {
     }
 
     await kv.set(`resume:${uuid}`, JSON.stringify(data));
+    saveResume(data);
     setStatusText("Analysis complete. Redirecting…");
     navigate(`/resume/${uuid}`);
 
@@ -268,6 +270,7 @@ export default function UploadPage() {
         const recommendedJobs = await recommendJobs(searchQuery, resumeText);
         data.recommendedJobs = recommendedJobs;
         await kv.set(`resume:${uuid}`, JSON.stringify(data));
+        saveResume(data);
       } catch (err) {
         console.error("recommendJobs threw:", err);
       }

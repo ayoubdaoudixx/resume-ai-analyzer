@@ -5,9 +5,10 @@ import { AlertCircle, ArrowRight, Check, Download, Info, Share2 } from "lucide-r
 import { Shell } from "~/components/resumer/Shell";
 import { ScoreRing } from "~/components/resumer/ScoreRing";
 import { usePuterStore } from "~/lib/puter";
+import { loadResume } from "~/lib/resumeStore";
 
 export const meta = () => [
-  { title: "Resumer — The verdict" },
+  { title: "Resummary — The verdict" },
   { name: "description", content: "Detailed review of your résumé." },
 ];
 
@@ -124,9 +125,10 @@ export default function ReviewPage() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const stored = await kv.get(`resume:${id}`);
-      if (!stored || cancelled) return;
-      const data = JSON.parse(stored);
+      const raw = await kv.get(`resume:${id}`);
+      const stored = raw ?? null;
+      const data = stored ? JSON.parse(stored) : loadResume(id!);
+      if (!data || cancelled) return;
 
       setFeedback(data.feedback || null);
       setMeta({

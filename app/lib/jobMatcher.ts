@@ -35,6 +35,8 @@ interface JSearchJob {
     job_posted_at_datetime_utc?: string;
     job_required_skills?: string[];
     job_highlights?: { Qualifications?: string[] };
+    apply_options?: Array<{ publisher?: string; apply_link?: string; is_direct?: boolean }>;
+    job_google_link?: string;
 }
 
 const STOP_WORDS = new Set([
@@ -243,6 +245,23 @@ function formatSalary(job: JSearchJob): string {
     return `${prefix}${round(max || min)}${suffix}`;
 }
 
+function pickApplyUrl(job: JSearchJob): string {
+    if (job.job_apply_link && /^https?:\/\//i.test(job.job_apply_link)) {
+        return job.job_apply_link;
+    }
+    const options = Array.isArray(job.apply_options) ? job.apply_options : [];
+    const direct = options.find((o) => o?.is_direct && o?.apply_link);
+    if (direct?.apply_link && /^https?:\/\//i.test(direct.apply_link)) {
+        return direct.apply_link;
+    }
+    const any = options.find((o) => o?.apply_link && /^https?:\/\//i.test(o.apply_link!));
+    if (any?.apply_link) return any.apply_link;
+    if (job.job_google_link && /^https?:\/\//i.test(job.job_google_link)) {
+        return job.job_google_link;
+    }
+    return "";
+}
+
 function formatEmploymentType(raw?: string): string {
     switch ((raw || "").toUpperCase()) {
         case "FULLTIME": return "Full-time";
@@ -310,7 +329,7 @@ function rankJobs(resumeText: string, jobs: JSearchJob[]): JobCard[] {
             company: job.employer_name || "",
             skills,
             location,
-            url: job.job_apply_link || "",
+            url: pickApplyUrl(job),
             score: Number(score.toFixed(4)),
             salary: formatSalary(job),
             employmentType: formatEmploymentType(job.job_employment_type),
@@ -319,8 +338,11 @@ function rankJobs(resumeText: string, jobs: JSearchJob[]): JobCard[] {
         };
     });
 
-    ranked.sort((a, b) => b.score - a.score);
-    return ranked.slice(0, 6);
+    // Drop postings without a usable apply URL — recommending a job we can't
+    // link to just sends the user to a dead "#" anchor.
+    const applicable = ranked.filter((c) => /^https?:\/\//i.test(c.url));
+    applicable.sort((a, b) => b.score - a.score);
+    return applicable.slice(0, 6);
 }
 
 export async function recommendJobs(

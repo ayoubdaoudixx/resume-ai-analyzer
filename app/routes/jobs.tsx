@@ -6,7 +6,7 @@ import { Shell } from "~/components/resumer/Shell";
 import { usePuterStore } from "~/lib/puter";
 
 export const meta = () => [
-  { title: "Resumer — Jobs" },
+  { title: "Resummary — Jobs" },
   { name: "description", content: "Roles, read against your résumé." },
 ];
 

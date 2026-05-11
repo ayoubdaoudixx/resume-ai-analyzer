@@ -12,7 +12,7 @@ export function Brand() {
   return (
     <Link to="/" className="brand">
       <img src="/resumer-black.png" alt="" className="brand-logo" />
-      <span>Resumer</span>
+      <span>Resummary</span>
       <span className="brand-tag">v3</span>
     </Link>
   );

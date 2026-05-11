@@ -2,7 +2,7 @@ export function Footer() {
   return (
     <footer className="footer">
       <div className="footer-inner">
-        <img src="/resumer-white.png" alt="Resumer" className="footer-logo" />
+        <img src="/resumer-white.png" alt="Resummary" className="footer-logo" />
         <h2 className="footer-mark">
           Make it{" "}
           <span className="muted footer-mark-tail">
@@ -16,7 +16,7 @@ export function Footer() {
         </h2>
         <div className="footer-grid">
           <div>
-            <h5>Resumer</h5>
+            <h5>Resummary</h5>
             <p
               style={{
                 fontSize: 14,
@@ -59,7 +59,7 @@ export function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} Resumer</span>
+          <span>© {new Date().getFullYear()} Resummary</span>
           <span>SOC 2 · ISO‑27001</span>
         </div>
       </div>

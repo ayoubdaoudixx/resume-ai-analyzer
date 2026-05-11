@@ -6,7 +6,7 @@ import { Shell } from "~/components/resumer/Shell";
 import { usePuterStore } from "~/lib/puter";
 
 export const meta = () => [
-  { title: "Resumer — Sign in" },
+  { title: "Resummary — Sign in" },
   { name: "description", content: "Log in to start the journey." },
 ];
 

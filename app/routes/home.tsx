@@ -6,10 +6,11 @@ import type { Route } from "./+types/home";
 import { Shell } from "~/components/resumer/Shell";
 import { SectionHead } from "~/components/resumer/SectionHead";
 import { usePuterStore } from "~/lib/puter";
+import { loadAllResumes } from "~/lib/resumeStore";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Resumer - Make It Read" },
+    { title: "Resummary - Make It Read" },
     {
       name: "description",
       content:
@@ -408,22 +409,35 @@ export default function Home() {
     async function loadResumes() {
       setLoadingResumes(true);
       try {
-        const records = (await kv.list("resume:*", true)) as KVItem[] | null;
+        // Load from Puter KV
+        let kvResumes: RealResume[] = [];
+        try {
+          const records = (await kv.list("resume:*", true)) as KVItem[] | null;
+          kvResumes = (records || [])
+            .map((r) => {
+              try { return JSON.parse(r.value) as RealResume; } catch { return null; }
+            })
+            .filter(Boolean) as RealResume[];
+        } catch (err) {
+          console.warn("home: kv.list failed, falling back to localStorage", err);
+        }
+
         if (cancelled) return;
-        const parsed: RealResume[] = (records || [])
-          .map((r) => {
-            try {
-              return JSON.parse(r.value) as RealResume;
-            } catch {
-              return null;
-            }
-          })
-          .filter(Boolean) as RealResume[];
+
+        // Merge with localStorage — fills in any resumes Puter KV missed
+        const localResumes = loadAllResumes() as unknown as RealResume[];
+        const seen = new Set(kvResumes.map((r) => r.id));
+        for (const r of localResumes) {
+          if (r.id && !seen.has(r.id)) {
+            kvResumes.push(r);
+            seen.add(r.id);
+          }
+        }
 
         // Historical order — newest first
-        parsed.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        kvResumes.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 
-        if (!cancelled) setResumes(parsed);
+        if (!cancelled) setResumes(kvResumes);
       } catch (err) {
         console.warn("home: failed to load resumes", err);
       } finally {
